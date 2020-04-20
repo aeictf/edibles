@@ -10,5 +10,3 @@ edibles_pythondir = "/home/fanhaoyu/PycharmWorkplace/edibles/"
 # where you keep your codes
 edibles_linelist = "/media/EDIBLES/LineCatalog/EDIBLES_LineList.txt"
 # the default line catalog to be loaded into the build-in dictonary
-edibles_ISMinfo = "/media/EDIBLES/LineCatalog/EDIBLES_ISM.dat"
-# the default ISM velocity info

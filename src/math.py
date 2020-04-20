@@ -18,7 +18,7 @@ def voigtMath(x, alpha, gamma):
     :type x: ndarray of float64
     :param alpha: Gaussian HWHM component, in AA
     :type alpha: float
-    :param gamma: Lorentzian HWHM component, in AA
+    :param gamma: Lorentzian dammping parameter, in AA
     :type gamma: float
 
     :return: standard_voigt, y points of a Voigt profile as defined by inputs
@@ -117,6 +117,29 @@ def voigtOpticalDepthAbsorption(lam, lam_0, b, d, tau_0=0.1, N=None, f=None):
 
     return transmission
 
+def integrateEW(x, y, continuum=1.0):
+    """
+    direct integration to calculate the peak area under a curve
+
+    :param x: wavelength grid, in AA
+    :type x: ndarray of float
+    :param y: flux, same length as x
+    :type y: ndarray of float
+    :param continuum: constant continuum to be used, default to 1.0
+    :type continuum: float
+    :return: EW, integrated peak area under the continuum
+    :rtype: float
+    """
+
+    assert len(x) == len(y), "input x and y must have the same length!"
+    EW = 0
+    for i in range(len(x)-1):
+        dx = x[i+1] - x[i]
+        assert dx > 0, "input x must be in increasing order!"
+        dEW = ((continuum - y[i]) + (continuum - y[i+1])) * dx / 2
+        EW = EW + dEW
+
+    return EW
 
 def euclidean_distance(point1,point2):
     """

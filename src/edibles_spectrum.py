@@ -4,6 +4,7 @@ import astropy.constants as cst
 import matplotlib.pyplot as plt
 import os
 import math
+import copy
 
 import edibles.edibles_settings as Setting
 import edibles.src.datahandling as DataHandling
@@ -22,7 +23,7 @@ class EdiblesSpectrum:
         Filename is relative to the DR4 directory
         """
         self.__clearAll__()
-        self.color_map = ["m", "g", "c", "y", "tan", "teal"]
+        self.color_map = ["m", "g", "c", "y", "tan", "teal"]*5
 
         self.loadLineList()
 
@@ -469,7 +470,7 @@ class EdiblesSpectrum:
             x_out = []
             wavelength = DataHandling.parseInput(1, wavelength, checklen=False)
             if len(wavelength) == 1:
-                x_out = point_x_all / wavelength[0]
+                x_out = (point_x_all / wavelength[0] - 1) * cst.c.to('km/s').value
             else:
                 sub_length = math.floor(len(point_x_all) / len(wavelength))
                 n_subs = math.floor(len(point_x_all)/sub_length)
@@ -965,6 +966,36 @@ class EdiblesSpectrum:
         else:
             return result
 
+    def reportEW(self,*kwords, nsigma = 5, dx = 0.01, continuum=1.0):
+        assert self.model is not None, "No model imported!"
+        line_name, line_EW = [], []
+        unit = "A"
+        if "mA" in kwords: unit = "mA"
+
+        c_name, c_value = self.raiseParameter(module="const1d", par="c0", silence=True)
+        if len(c_value) > 0: continuum = c_value[0]
+
+
+        if not self.model_fit:
+            print("="*16)
+            print("Warning! These values are not final!")
+            print("=" * 16)
+
+        model_items = DataHandling.deconstructModel(self.model.parts)
+        for item in model_items:
+            if hasattr(item,"report_EW"):
+                EW = item.report_EW(*kwords, continuum=continuum)
+                str = "{name}: {EW:.2f} {unit}".format(name=item.name, EW=EW, unit=unit)
+                print(str)
+                line_name.append(item.name)
+                line_EW.append(EW)
+
+        return line_name, line_EW
+
+
+
+
+
     def printHeader(self,panels=None):
         panels = sp.__parsePanelsInput__(panels)
         for i, panel in enumerate(panels):
@@ -991,7 +1022,7 @@ class EdiblesSpectrum:
         plt.show()
         return None
 
-    def __makeBasicPlots__(self,x_label=True, y_label=True, continuum=True, model=True, masked=True, highlight="All", panels=None):
+    def __makeBasicPlots__(self,x_label=True, y_label=True, continuum=True, model=True, masked=True, highlight=True, panels=None):
         panels = self.__parsePanelsInput__(panels)
         n_plots = len(panels)
 
@@ -1055,7 +1086,7 @@ class EdiblesSpectrum:
                 ax.set_ylabel(y_label_str)
         return None
 
-    def __auxiliaryPlot__(self, ax=None, continuum=True, model=True, masked=True, highlight="All", panel=0):
+    def __auxiliaryPlot__(self, ax=None, continuum=True, model=True, masked=True, highlight=True, panel=0):
         # trivial matters, continuum at unity, model, masked; marked lines to be added
         if ax is None: ax = plt.gca()
         x = self.__parseX__(panel=panel)
@@ -1076,7 +1107,7 @@ class EdiblesSpectrum:
 
         # marked lines
         if highlight:
-            if highlight.lower() == "all": highlight = self.linelistspecies
+            highlight = self.linelistspecies
             xmin, xmax = np.min(self.wave_working[panel]), np.max(self.wave_working[panel])
             ymin, ymax = np.min(self.flux_working[panel]), np.max(self.flux_working[panel])
             for i, species in enumerate(highlight):
@@ -1153,7 +1184,7 @@ class EdiblesSpectrum:
         return peak_wavelengths
 
     def importModel(self, model):
-        self.model = model
+        self.model = copy.deepcopy(model)
         self.__addLog__(">>importModel: ")
         self.__addLog__(str(model))
         print("New model imported!")
@@ -1171,7 +1202,7 @@ class EdiblesSpectrum:
 
         return None
 
-    def raiseParameter(self, module="any", par='any'):
+    def raiseParameter(self, module="any", par='any', silence=False):
         if not self.model_fit:
             print("="*16)
             print("Warning! These values are not final!")
@@ -1189,7 +1220,7 @@ class EdiblesSpectrum:
                 if module in tmp_fullname and par in tmp_fullname:
                     names.append(self.model.pars[i].fullname)
                     values.append(self.model.pars[i].val)
-                    print((names[-1], values[-1]))
+                    if not silence: print((names[-1], values[-1]))
 
         return names, values
 
@@ -1415,3 +1446,38 @@ if __name__ == '__main__':
     plt.vlines((7667.021, 7701.093), 0, 160, linestyles='dashed', colors='r')
     plt.legend()
     plt.show()
+
+
+
+
+class ISM_Info:
+
+    def __init__(self,datafile=None):
+        if datafile is None: datafile = Setting.edibles_ISMinfo
+        self.sightline_velocities = {}
+        with open(datafile) as f:
+            while True:
+                line = f.readline().replace("\n","")
+                if not line: break
+                line_split = line.split(",")
+                sightline = line_split[0]
+                velocities_str = line_split[1]
+                velocities_str = velocities_str.split(";")
+                velocities=[]
+                for velocity_str in velocities_str:
+                    velocities.append(float(velocity_str))
+                velocities = np.array(velocities)
+                self.sightline_velocities[sightline] = velocities
+
+    def lookupVelocity(self,sightline, mode="average"):
+        assert mode.lower() in ["average", "all"], "Only 'average' and 'all' modes are allowed!"
+
+        if sightline not in self.sightline_velocities.keys():
+            print("ISM velocity for sightline {name} is unknown".format(name=sightline))
+            return 0.0
+        else:
+            result = self.sightline_velocities[sightline]
+            if mode.lower() == "all":
+                return result
+            else:
+                return np.mean(result)

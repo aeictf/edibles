@@ -527,6 +527,26 @@ def parseInput(n,*inputs, checklen=True):
     return inputs_out
 
 
+def deconstructModel(parts):
+    """
+    To deconstruct the model and return a tupple of the lines, continuum, and instrumental convolution in the model.
+    :param parts: the "parts" attribute of an integrated sherpa model
+    :type parts: model.parts
+
+    :return: a tuple containing all items in the model
+    """
+    if type(parts) != tuple:
+        T = (parts,)
+        return deconstructModel(parts)
+    else:
+        if hasattr(parts[0],'parts'):
+            if len(parts) == 1: return deconstructModel(parts[0].parts)
+            else: return deconstructModel(parts[0].parts) + deconstructModel(parts[1:])
+        else:
+            if len(parts) == 1: return (parts[0],)
+            else: return (parts[0],) + deconstructModel(parts[1:])
+
+
 if __name__ == '__main__':
     for i in range(len(mode_all)):
         print(mode_all[i])
